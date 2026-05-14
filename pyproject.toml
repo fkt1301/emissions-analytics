@@ -1,0 +1,27 @@
+[project]
+name = "green-travel"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+dependencies = [
+    # ingestion
+    "requests>=2.31.0",
+    "pandas>=2.0.0",
+    "google-cloud-bigquery>=3.11.0",
+    "google-cloud-bigquery-storage>=2.22.0",
+    "db-dtypes>=1.1.1",
+
+    # dbt
+    "dbt-core>=1.7.0",
+    "dbt-bigquery>=1.7.0",
+
+    # airflow providers added via base image — don't reinstall here
+    # apache-airflow>=2.8.0
+    # apache-airflow-providers-google>=10.13.0
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.4.0",
+    "ruff>=0.1.0",
+]

@@ -1,0 +1,19 @@
+name: green_travel
+version: '1.0.0'
+profile: green_travel
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+models:
+  green_travel:
+    staging:
+      +materialized: view
+      +dataset: staging
+    intermediate:
+      +materialized: view
+      +dataset: intermediate
+    marts:
+      +materialized: table
+      +dataset: marts

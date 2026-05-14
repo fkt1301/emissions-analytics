@@ -1,0 +1,19 @@
+# uv
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.python-version
+
+# credentials — NEVER commit
+keys/
+.env
+
+# Airflow
+logs/
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
