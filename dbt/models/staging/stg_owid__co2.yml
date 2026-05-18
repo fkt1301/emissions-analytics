@@ -2,7 +2,7 @@ version: 2
 
 models:
   - name: stg_owid__co2
-    description: "Cleaned and renamed OWID CO2 dataset. One row per country per year."
+    description: "Cleaned OWID CO2 dataset. One row per country per year."
     columns:
       - name: country_code
         description: "ISO 3166-1 alpha-3 country code"
@@ -13,10 +13,12 @@ models:
         description: "Total CO2 emissions in megatonnes"
         tests:
           - dbt_utils.accepted_range:
-              min_value: 0
-              max_value: 40000
-      - name: transport_co2_mt
+              arguments:
+                min_value: 0
+                max_value: 40000
+      - name: oil_co2_mt
         tests:
           - dbt_utils.accepted_range:
-              min_value: 0
-              max_value: 10000
+              arguments:
+                min_value: 0
+                max_value: 10000
