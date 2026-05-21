@@ -1,0 +1,48 @@
+name: dbt CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  dbt-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --frozen --no-dev
+
+      - name: Write GCP service account key
+        run: |
+          mkdir -p keys
+          echo '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}' > keys/gcp-keyfile.json
+
+      - name: Set up dbt profiles
+        run: |
+          cp dbt/profiles.yml profiles.yml
+
+      - name: dbt deps
+        run: uv run dbt deps --profiles-dir dbt
+        working-directory: dbt
+
+      - name: dbt compile
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GOOGLE_APPLICATION_CREDENTIALS: ../keys/gcp-keyfile.json
+        run: uv run dbt compile --profiles-dir .
+        working-directory: dbt
+
+      - name: dbt test
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GOOGLE_APPLICATION_CREDENTIALS: ../keys/gcp-keyfile.json
+        run: uv run dbt test --profiles-dir .
+        working-directory: dbt
