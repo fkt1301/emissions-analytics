@@ -1,0 +1,24 @@
+version: 2
+
+models:
+  - name: int_countries__profile
+    description: "Enriched country dimension with GDP, population and energy profile"
+    columns:
+      - name: country_code
+        tests: [not_null]
+      - name: reference_year
+        tests: [not_null]
+
+  - name: int_co2__by_source
+    description: "CO2 emissions broken down by fossil fuel source per country/year"
+    columns:
+      - name: country_code
+        tests: [not_null]
+      - name: reference_year
+        tests: [not_null]
+      - name: fossil_share
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1.1
