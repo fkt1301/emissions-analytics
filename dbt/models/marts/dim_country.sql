@@ -26,5 +26,9 @@ select
     gdp_usd,
     gdp_per_capita_usd,
     energy_profile,
-    co2_per_unit_energy
+    co2_per_unit_energy,
+
+    -- metadata
+    current_timestamp()                     as dbt_updated_at
+
 from latest

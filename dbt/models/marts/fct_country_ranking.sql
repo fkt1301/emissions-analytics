@@ -37,7 +37,10 @@ ranked as (
             order by fossil_share desc
         )                                       as fossil_rank,
 
-        population
+        population,
+
+        -- metadata
+        current_timestamp()                     as dbt_updated_at
 
     from emissions
     where co2_mt is not null
