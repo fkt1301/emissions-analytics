@@ -12,3 +12,15 @@ sources:
     tables:
       - name: owid_co2_raw
         description: "Raw CO2 and energy data from Our World in Data"
+
+  - name: worldbank
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: raw
+    config:
+      freshness:
+        warn_after: {count: 365, period: hour}
+        error_after: {count: 730, period: hour}
+      loaded_at_field: _ingested_at
+    tables:
+      - name: worldbank_indicators_raw
+        description: "Energy and development indicators from World Bank API"
