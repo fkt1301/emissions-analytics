@@ -36,13 +36,13 @@ jobs:
       - name: dbt compile
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          GOOGLE_APPLICATION_CREDENTIALS: ../keys/gcp-keyfile.json
-        run: uv run dbt compile --profiles-dir . --target dev
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/keys/gcp-keyfile.json
+        run: uv run dbt compile --profiles-dir . --target dev_local
         working-directory: dbt
 
       - name: dbt test
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          GOOGLE_APPLICATION_CREDENTIALS: ../keys/gcp-keyfile.json
-        run: uv run dbt test --profiles-dir . --target dev
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/keys/gcp-keyfile.json
+        run: uv run dbt test --profiles-dir . --target dev_local
         working-directory: dbt
