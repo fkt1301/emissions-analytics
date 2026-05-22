@@ -21,3 +21,6 @@ dbt/.user.yml
 
 # Mac
 .DS_Store
+
+# VSCode
+.vscode/
