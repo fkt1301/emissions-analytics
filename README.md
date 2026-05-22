@@ -1,36 +1,39 @@
 # Emissions Analytics
 
-![dbt CI](https://github.com/YOUR_USERNAME/emissions-analytics/actions/workflows/dbt_ci.yml/badge.svg)
+![dbt CI](https://github.com/fkt1301/emissions-analytics/actions/workflows/dbt_ci.yml/badge.svg)
 
 A modern data engineering pipeline for global CO2 emissions analysis, built with Apache Airflow, dbt, and BigQuery on Google Cloud Platform.
 
 ## Architecture
 
 ```
-OWID CO2 Dataset (CSV)
-        │
-        ▼
-  Python Ingestion
-  (owid_to_bq.py)x
-        │
-        ▼
-BigQuery — raw.owid_co2_raw
-        │
-        ▼
-   dbt staging
-   stg_owid__co2 (view)
-        │
-        ▼
-  dbt intermediate
-  ├── int_countries__profile (view)
-  └── int_co2__by_source (view)
-        │
-        ▼
-    dbt marts
-  ├── fct_co2_emissions (table)
-  ├── fct_emissions_trend (table)
-  ├── fct_country_ranking (table)
-  └── dim_country (table)
+OWID CO2 Dataset (CSV)          World Bank API
+        │                               │
+        ▼                               ▼
+  Python Ingestion              Python Ingestion
+  (owid_to_bq.py)            (worldbank_to_bq.py)
+        │                       incremental load
+        │                               │
+        ▼                               ▼
+BigQuery — raw.owid_co2_raw    raw.worldbank_indicators_raw
+        │                               │
+        └───────────┬───────────────────┘
+                    ▼
+             dbt staging
+      stg_owid__co2 (view)
+      stg_worldbank__indicators (view)
+                    │
+                    ▼
+          dbt intermediate
+      int_countries__profile (view)   ← joins both sources
+      int_co2__by_source (view)
+                    │
+                    ▼
+              dbt marts
+      fct_co2_emissions (table)
+      fct_emissions_trend (table)
+      fct_country_ranking (table)
+      dim_country (table)
 ```
 
 ## Business Questions Answered
@@ -40,6 +43,9 @@ BigQuery — raw.owid_co2_raw
 - How dependent is each country on fossil fuels?
 - Which countries have the highest emissions per capita?
 - What is the gap between production-based and consumption-based emissions per country?
+- Which countries have the highest renewable energy share?
+- How does electricity access correlate with emissions levels?
+- How does urbanization relate to energy consumption per capita?
 
 ## Stack
 
@@ -53,30 +59,53 @@ BigQuery — raw.owid_co2_raw
 | Infrastructure | Docker Compose |
 | CI | GitHub Actions |
 
+## Data Sources
+
+| Source | Dataset | Granularity | Load strategy |
+|---|---|---|---|
+| [Our World in Data](https://github.com/owid/co2-data) | CO2 & energy by country | Country / year | Full refresh |
+| [World Bank API](https://data.worldbank.org) | Energy & development indicators | Country / year | Incremental |
+
 ## Project Structure
 
 ```
 emissions-analytics/
-├── dags/                        # Airflow DAGs
-│   └── emissions_analytics_pipeline.py
-├── dbt/                         # dbt project
+├── dags/
+│   └── emissions_analytics_pipeline.py   # Airflow DAG
+├── dbt/
 │   ├── models/
-│   │   ├── staging/             # 1-to-1 with sources, light cleaning
-│   │   ├── intermediate/        # business logic, joins
-│   │   └── marts/               # analyst-ready tables
+│   │   ├── staging/                      # 1-to-1 with sources, light cleaning
+│   │   ├── intermediate/                 # business logic, joins
+│   │   └── marts/                        # analyst-ready tables
 │   ├── macros/
 │   ├── profiles.yml
 │   └── dbt_project.yml
-├── ingestion/                   # raw data loaders
-│   └── owid_to_bq.py
+├── ingestion/
+│   ├── owid_to_bq.py                     # OWID full refresh ingestion
+│   └── worldbank_to_bq.py                # World Bank incremental ingestion
+├── .github/
+│   └── workflows/
+│       └── dbt_ci.yml                    # CI pipeline
 ├── Dockerfile
 ├── docker-compose.yml
-└── pyproject.toml               # dependencies managed by uv
+└── pyproject.toml
 ```
 
 ## dbt Lineage
 
 ![dbt lineage](docs/lineage.png)
+
+## DAG
+
+The pipeline runs daily at 6am. Both ingestions run in parallel before dbt starts:
+
+```
+ingest_owid_to_bq ──┐
+                    ├──► dbt_deps ──► dbt_run_staging ──► dbt_test_staging
+ingest_worldbank ───┘                      ──► dbt_run_intermediate ──► dbt_test_intermediate
+                                                   ──► dbt_run_marts ──► dbt_test_marts
+                                                               ──► dbt_generate_docs
+```
 
 ## Getting Started
 
@@ -90,7 +119,7 @@ emissions-analytics/
 
 1. Clone the repo:
 ```bash
-git clone https://github.com/YOUR_USERNAME/emissions-analytics.git
+git clone https://github.com/fkt1301/emissions-analytics.git
 cd emissions-analytics
 ```
 
@@ -116,24 +145,12 @@ docker compose up --build -d
 
 6. Open Airflow at `http://localhost:8080` (admin/admin), trigger the DAG manually.
 
-## DAG
+### Local dbt development
 
-The pipeline runs daily at 6am and executes the following steps:
-
+```bash
+uv sync
+cd dbt
+../venv/bin/dbt deps --profiles-dir .
+../venv/bin/dbt run --profiles-dir .
+../venv/bin/dbt test --profiles-dir .
 ```
-ingest_owid_to_bq
-      │
-   dbt_deps
-      │
- dbt_run_staging → dbt_test_staging
-                          │
-              dbt_run_intermediate → dbt_test_intermediate
-                                              │
-                                      dbt_run_marts → dbt_test_marts
-                                                              │
-                                                    dbt_generate_docs
-```
-
-## Data Source
-
-[Our World in Data — CO2 and Greenhouse Gas Emissions](https://github.com/owid/co2-data)
