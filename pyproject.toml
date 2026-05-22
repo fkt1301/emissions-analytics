@@ -14,10 +14,6 @@ dependencies = [
     # dbt
     "dbt-core>=1.7.0",
     "dbt-bigquery>=1.7.0",
-
-    # airflow providers added via base image — don't reinstall here
-    # apache-airflow>=2.8.0
-    # apache-airflow-providers-google>=10.13.0
 ]
 
 [tool.uv]
