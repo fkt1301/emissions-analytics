@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from airflow import DAG
+from airflow.models import Variable
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
 
@@ -9,12 +10,18 @@ default_args = {
     "retry_delay": timedelta(minutes=5),
 }
 
+# set dbt_target variable in Airflow UI (Admin → Variables)
+# dev = dev_staging, dev_intermediate, dev_marts
+# prod = staging, intermediate, marts
+DBT_TARGET = Variable.get("dbt_target", default_var="prod")
+DBT_BASE = f"cd /opt/airflow/dbt && dbt --target {DBT_TARGET} --profiles-dir /opt/airflow/dbt"
+
 with DAG(
     dag_id="emissions_analytics_pipeline",
     default_args=default_args,
     description="Ingest OWID CO2 + World Bank → BigQuery → dbt transformations",
     schedule_interval="0 6 * * *",
-    start_date=datetime(2024, 1, 1),
+    start_date=datetime(2026, 1, 1),
     catchup=False,
     tags=["emissions-analytics", "dbt", "bigquery"],
 ) as dag:
@@ -41,7 +48,7 @@ with DAG(
     ingest_worldbank_task = PythonOperator(
         task_id="ingest_worldbank_to_bq",
         python_callable=ingest_worldbank,
-        retries=5,                          # flaky API needs more retries
+        retries=5,
         retry_delay=timedelta(minutes=2),
     )
 
@@ -52,38 +59,47 @@ with DAG(
 
     dbt_run_staging = BashOperator(
         task_id="dbt_run_staging",
-        bash_command="cd /opt/airflow/dbt && dbt run --select staging --profiles-dir /opt/airflow/dbt",
+        bash_command=f"{DBT_BASE} run --select staging",
     )
 
     dbt_test_staging = BashOperator(
         task_id="dbt_test_staging",
-        bash_command="cd /opt/airflow/dbt && dbt test --select staging --profiles-dir /opt/airflow/dbt",
+        bash_command=f"{DBT_BASE} test --select staging",
     )
 
     dbt_run_intermediate = BashOperator(
         task_id="dbt_run_intermediate",
-        bash_command="cd /opt/airflow/dbt && dbt run --select intermediate --profiles-dir /opt/airflow/dbt",
+        bash_command=f"{DBT_BASE} run --select intermediate",
     )
 
     dbt_test_intermediate = BashOperator(
         task_id="dbt_test_intermediate",
-        bash_command="cd /opt/airflow/dbt && dbt test --select intermediate --profiles-dir /opt/airflow/dbt",
+        bash_command=f"{DBT_BASE} test --select intermediate",
     )
 
     dbt_run_marts = BashOperator(
         task_id="dbt_run_marts",
-        bash_command="cd /opt/airflow/dbt && dbt run --select marts --profiles-dir /opt/airflow/dbt",
+        bash_command=f"{DBT_BASE} run --select marts",
     )
 
     dbt_test_marts = BashOperator(
         task_id="dbt_test_marts",
-        bash_command="cd /opt/airflow/dbt && dbt test --select marts --profiles-dir /opt/airflow/dbt",
+        bash_command=f"{DBT_BASE} test --select marts",
     )
 
     dbt_docs = BashOperator(
         task_id="dbt_generate_docs",
-        bash_command="cd /opt/airflow/dbt && dbt docs generate --profiles-dir /opt/airflow/dbt",
+        bash_command=f"{DBT_BASE} docs generate",
     )
 
-    # both ingestions run in parallel, then dbt pipeline starts
-    [ingest_owid_task, ingest_worldbank_task] >> dbt_deps >> dbt_run_staging >> dbt_test_staging >> dbt_run_intermediate >> dbt_test_intermediate >> dbt_run_marts >> dbt_test_marts >> dbt_docs
+    (
+        [ingest_owid_task, ingest_worldbank_task]
+        >> dbt_deps
+        >> dbt_run_staging
+        >> dbt_test_staging
+        >> dbt_run_intermediate
+        >> dbt_test_intermediate
+        >> dbt_run_marts
+        >> dbt_test_marts
+        >> dbt_docs
+    )
