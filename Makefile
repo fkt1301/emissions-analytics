@@ -10,7 +10,8 @@ ifneq (,$(wildcard .env.local))
     export
 endif
 
-DBT_LOCAL = cd dbt && ../.venv/bin/dbt --profiles-dir .
+DBT_LOCAL = cd dbt && ../.venv/bin/dbt
+DBT_LOCAL_ARGS = --profiles-dir .
 DBT_DOCKER = docker compose exec airflow-scheduler bash -c "cd /opt/airflow/dbt && dbt --profiles-dir /opt/airflow/dbt"
 
 help: ## show this help
@@ -41,22 +42,22 @@ logs: ## tail airflow logs
 # ── Local dbt (Mac) ───────────────────────────────────────────────────────────
 
 dbt-deps: ## install dbt packages locally
-	$(DBT_LOCAL) deps
+	$(DBT_LOCAL) deps $(DBT_LOCAL_ARGS)
 
 dbt-run: ## run all dbt models locally (dev)
-	$(DBT_LOCAL) run
+	$(DBT_LOCAL) run $(DBT_LOCAL_ARGS)
 
 dbt-test: ## test all dbt models locally (dev)
-	$(DBT_LOCAL) test
+	$(DBT_LOCAL) test $(DBT_LOCAL_ARGS)
 
 dbt-freshness: ## check source freshness locally
-	$(DBT_LOCAL) source freshness
+	$(DBT_LOCAL) source freshness $(DBT_LOCAL_ARGS)
 
 dbt-docs: ## generate and serve dbt docs locally
-	$(DBT_LOCAL) docs generate && $(DBT_LOCAL) docs serve --port 8081
+	$(DBT_LOCAL) docs generate $(DBT_LOCAL_ARGS) && $(DBT_LOCAL) docs serve $(DBT_LOCAL_ARGS) --port 8081
 
 dbt-run-select: ## run specific model locally e.g. make dbt-run-select SELECT=staging
-	$(DBT_LOCAL) run --select $(SELECT)
+	$(DBT_LOCAL) run $(DBT_LOCAL_ARGS) --select $(SELECT)
 
 # ── Docker dbt ────────────────────────────────────────────────────────────────
 
