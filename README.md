@@ -52,7 +52,7 @@ BigQuery — raw.owid_co2_raw    raw.worldbank_indicators_raw
 | Layer | Tool |
 |---|---|
 | Orchestration | Apache Airflow 2.8 |
-| Transformation | dbt 1.11 |
+| Transformation | dbt 1.11 (dbt-bigquery) |
 | Warehouse | Google BigQuery |
 | Ingestion | Python + Pandas |
 | Dependency management | uv |
@@ -66,6 +66,17 @@ BigQuery — raw.owid_co2_raw    raw.worldbank_indicators_raw
 | [Our World in Data](https://github.com/owid/co2-data) | CO2 & energy by country | Country / year | Full refresh |
 | [World Bank API](https://data.worldbank.org) | Energy & development indicators | Country / year | Incremental |
 
+## dbt Packages
+
+Declared in `dbt/packages.yml` and pinned in `dbt/package-lock.yml`:
+
+| Package | Version | Used for |
+|---|---|---|
+| [dbt-labs/dbt_utils](https://github.com/dbt-labs/dbt-utils) | `>=1.1.0, <2.0.0` | Surrogate keys, `accepted_range` data tests |
+| [metaplane/dbt_expectations](https://github.com/metaplane/dbt-expectations) | `>=0.10.0, <1.0.0` | Extended data quality tests |
+
+Run `make dbt-deps` (local) or `make docker-deps` (container) to install them before compiling or running models.
+
 ## Project Structure
 
 ```
@@ -78,7 +89,10 @@ emissions-analytics/
 │   │   ├── intermediate/                 # business logic, joins
 │   │   └── marts/                        # analyst-ready tables
 │   ├── macros/
-│   ├── profiles.yml
+│   │   └── generate_schema_name.sql      # dev_ prefix on non-prod schemas
+│   ├── packages.yml                      # dbt package dependencies
+│   ├── package-lock.yml                  # pinned package versions (generated)
+│   ├── profiles.yml                      # dev/prod BigQuery connection targets
 │   └── dbt_project.yml
 ├── ingestion/
 │   ├── owid_to_bq.py                     # OWID full refresh ingestion
@@ -88,6 +102,7 @@ emissions-analytics/
 │       └── dbt_ci.yml                    # CI pipeline
 ├── Dockerfile
 ├── docker-compose.yml
+├── Makefile                              # local + containerized dbt/pipeline shortcuts
 └── pyproject.toml
 ```
 
@@ -114,6 +129,7 @@ ingest_worldbank ───┘                      ──► dbt_run_intermediat
 - Docker Desktop
 - Google Cloud project with BigQuery enabled
 - GCP service account with BigQuery Admin role
+- [uv](https://docs.astral.sh/uv/) (for local Python/dbt dependency management)
 
 ### Setup
 
@@ -140,17 +156,66 @@ bq mk --dataset --location=EU YOUR_PROJECT_ID:marts
 
 5. Start the stack:
 ```bash
-docker compose up --build -d
+make up
 ```
+(equivalent to `docker compose up -d`; use `make build` the first time or after Dockerfile changes)
 
 6. Open Airflow at `http://localhost:8080` (admin/admin), trigger the DAG manually.
 
 ### Local dbt development
 
+Local dbt runs use the `dev` profile target (schemas prefixed `dev_`), so they're safe to run against the same GCP project as prod.
+
 ```bash
-uv sync
-cd dbt
-../venv/bin/dbt deps --profiles-dir .
-../venv/bin/dbt run --profiles-dir .
-../venv/bin/dbt test --profiles-dir .
+# install Python deps into .venv (created by uv)
+make install
+
+# also export GCP_PROJECT_ID and GOOGLE_APPLICATION_CREDENTIALS,
+# e.g. via a .env.local file (auto-loaded by the Makefile)
+
+make dbt-deps     # install dbt packages (dbt_utils, dbt_expectations)
+make dbt-run      # run all models against dev_* schemas
+make dbt-test     # run all tests
+make dbt-freshness  # check source freshness
+make dbt-docs     # generate + serve docs locally on :8081
 ```
+
+Run a specific layer with:
+```bash
+make dbt-run-select SELECT=staging
+```
+
+### Running dbt inside the container
+
+Once the stack is up (`make up`), you can run dbt against the Airflow container's environment instead of locally:
+
+```bash
+make docker-deps
+make docker-run     # dev target
+make docker-test    # dev target
+make docker-run-prod   # prod target — use with caution, writes to prod schemas
+make docker-test-prod
+```
+
+### Ingestion + full pipeline shortcuts
+
+```bash
+make ingest-owid        # run OWID ingestion once, ad hoc
+make ingest-worldbank   # run World Bank ingestion once, ad hoc
+make ingest-all         # both
+
+make pipeline-dev       # ingest-all → docker-deps → docker-run → docker-test
+make pipeline-prod      # same, but against prod schemas — use with caution
+```
+
+Run `make help` to see all available targets.
+
+## Contributing
+
+Pre-commit hooks (Ruff, sqlfluff for BigQuery SQL, trailing-whitespace/YAML/JSON checks) are configured in `.pre-commit-config.yaml`. Install them once with:
+
+```bash
+uv run pre-commit install
+```
+
+Before pushing, `make ci` mirrors what the GitHub Actions workflow checks: installs deps, installs dbt packages, compiles, and runs all dbt tests.
